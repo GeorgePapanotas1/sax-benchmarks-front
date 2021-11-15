@@ -1,0 +1,16 @@
+[
+  {
+    "name": "sax-benchmarking",
+    "path": "/sax-benchmarking",
+    "component": "/home/georgespotawheel/personal/AUEB/thesis/code/sax-benchmarks-front/pages/sax-benchmarking.vue",
+    "chunkName": "pages/sax-benchmarking",
+    "_name": "_346ecdcc"
+  },
+  {
+    "name": "index",
+    "path": "/",
+    "component": "/home/georgespotawheel/personal/AUEB/thesis/code/sax-benchmarks-front/pages/index.vue",
+    "chunkName": "pages/index",
+    "_name": "_c6b65220"
+  }
+]

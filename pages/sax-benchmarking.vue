@@ -70,6 +70,7 @@
           <span class="ml-2">Change Dataset</span>
         </label>
         <button
+          @click='fetchData'
           class="
             bg-indigo-500
             hover:bg-indigo-700
@@ -88,7 +89,7 @@
       </div>
     </section>
     <transition name="bounce">
-      <section class="results" v-if="alphabet_size && word_length">
+      <section class="results" v-if="sax_results">
         <div
           id="sax-results-wrapper"
           class="sax-results-wrapper border-t-2 border-indigo-600 pt-10 mt-20"
@@ -101,42 +102,60 @@
                 <p>Selected Alphabet Size: {{ alphabet_size }}</p>
               </div>
               <div class="timeseries-names mt-5">
-                <p>Timeseries 1 name: Lorem ipsum dolor sit</p>
-                <p>Timeseries 1 name: Lorem ipsum dolor sit</p>
+                <p>Timeseries 1 name: {{ sax_results.file_name_1 }}</p>
+                <p>Timeseries 1 name: {{ sax_results.file_name_2 }}</p>
               </div>
             </div>
             <div class="first_section_results_right">
               <div class="coefficients-section mt-5">
-                <p>Original Eucledian Distance: 22</p>
-                <p>SAX Distance: 10</p>
-                <p>Tighness of Lower Bound: 0.0222</p>
+                <p>Original Eucledian Distance: {{ sax_results.original_distance }}</p>
+                <p>SAX Distance: {{ sax_results.sax_distance }}</p>
+                <p>Tighness of Lower Bound: {{ sax_results.tlb }}</p>
               </div>
               <div class="timeseries-names mt-5">
-                <p>Original Timeseries 1 Size: 223123 Bytes</p>
-                <p>Original Timeseries 2 Size: 223123 Bytes</p>
-                <p>SAX Size: 1231 Bytes</p>
-                <p>Compression Ratio: 60%</p>
+                <p>Original Timeseries 1 Size: {{ (sax_results.t1_len /1024).toFixed(3) }} KB</p>
+                <p>SAX Size: {{ (sax_results.sax_size / 1024).toFixed(3) }} KB</p>
+                <p>Compression Ratio 1: {{ (100 - ((sax_results.sax_size / sax_results.t1_len) * 100 )).toFixed(3) }}%</p>
+                <p>Compression Ratio 2: {{ (100 - ((sax_results.sax_size / sax_results.t2_len) * 100 )).toFixed(3) }}%</p>
               </div>
             </div>
           </div>
+          <div class='text-center mt-10'>
+            <p>SAX 1: {{sax_results.sax1}}</p>
+            <p>SAX 2: {{sax_results.sax2}}</p>
+          </div>
           <div id="chart" class="mt-20">
             <apexchart
+              v-if='tlb_hist.length > 1'
               type="line"
               height="350"
               :options="chartOptions"
               :series="series"
             ></apexchart>
           </div>
-          <div id="chart2" class="mt-20">
-            <apexchart
-              type="line"
-              height="350"
-              :options="chartOptions"
-              :series="series"
-            ></apexchart>
-          </div>
+
         </div>
       </section>
+      <section class="results" v-else-if="!sax_results && fetching">
+        <p class="text-center text-xl mt-15"> Calculating...</p>
+        <div class="flex justify-center items-center">
+          <div
+            class="
+              loader
+              ease-linear
+              rounded-full
+              border-8 border-t-8 border-indigo-200
+              h-16
+              w-16
+              mt-5
+            "
+          ></div>
+        </div>
+      </section>
+      <section class="results" v-else>
+
+      </section>
+
     </transition>
   </section>
 </template>
@@ -147,17 +166,16 @@ import VueApexCharts from 'vue-apexcharts'
 export default {
   data() {
     return {
+      baseURL: 'http://localhost:5000/',
       alphabet_size: 10,
       word_length: 10,
       change_dataset: false,
+      tlb_hist: [],
+      fetching: false,
       series: [
         {
           name: 'Timeseries 1',
           data: [28, 29, 33, 36, 32, 32, 33],
-        },
-        {
-          name: 'Timeseries 2',
-          data: [12, 11, 14, 18, 17, 13, 13],
         },
       ],
       chartOptions: {
@@ -184,7 +202,7 @@ export default {
           curve: 'smooth',
         },
         title: {
-          text: 'Original SAX Graphs',
+          text: 'Tightness of Lower Bound Over Time',
           align: 'left',
         },
         grid: {
@@ -207,10 +225,10 @@ export default {
         },
         yaxis: {
           title: {
-            text: 'Timeseries',
+            text: 'Tightness of Lower Bound',
           },
-          min: 5,
-          max: 40,
+          min: 0,
+          max: 1,
         },
         legend: {
           position: 'top',
@@ -220,10 +238,37 @@ export default {
           offsetX: -5,
         },
       },
+      sax_results: null
     }
   },
   components: {
     apexchart: VueApexCharts,
+  },
+  methods:{
+    async fetchData(){
+      this.sax_results = null
+      this.fetching = true
+      const results = await fetch(`${this.baseURL}?word_length=${this.word_length}&alphabet_size=${this.alphabet_size}&change_dataset=${this.change_dataset}`,
+        {
+          headers: new Headers({
+            'Content-Type': 'application/json',
+          })
+        }
+      );
+      const data = await results.json()
+      this.fetching = false
+      this.sax_results = data
+      if(!this.change_dataset) {
+        this.tlb_hist.push(data.tlb)
+        this.series[0].data = this.tlb_hist
+        this.chartOptions.xaxis.max = this.tlb_hist.length
+
+      }else{
+        this.series[0].data = []
+      }
+      // this.series[0].data = data.dat1;
+      // this.series[2].data = data.dat2;
+    },
   },
 }
 </script>
@@ -250,6 +295,30 @@ export default {
   }
   100% {
     transform: scale(1);
+  }
+}
+
+.loader {
+  border-top-color: #3498db;
+  -webkit-animation: spinner 1.5s linear infinite;
+  animation: spinner 1.5s linear infinite;
+}
+
+@-webkit-keyframes spinner {
+  0% {
+    -webkit-transform: rotate(0deg);
+  }
+  100% {
+    -webkit-transform: rotate(360deg);
+  }
+}
+
+@keyframes spinner {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 </style>
